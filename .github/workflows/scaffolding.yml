@@ -3,34 +3,55 @@ name: Scaffold & Deploy Modern Vite React → GitHub Pages
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pages: write
+
 jobs:
   scaffold-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      # 1) Checkout (with push perms)
+      - uses: actions/checkout@v3
         with:
           persist-credentials: true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      # 2) Node 20+
+      - uses: actions/setup-node@v3
         with:
           node-version: '20'
 
+      # 3) Fetch Vite React TS via degit (just files, no install) 
       - name: Scaffold Vite + React TS
         run: |
-          # Fetch only the template files (no installs, no prompts)
           npx degit vitejs/vite/packages/create-vite/template/react-ts temp-app
           cp -a temp-app/. .
           rm -rf temp-app
 
+      # 4) Install your app’s dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # 5) Add dev-tooling: Tailwind v4 plugin, ESLint, Prettier, Vitest, Husky, shadcn
+      - name: Install dev dependencies
+        run: |
+          npm install -D \
+            tailwindcss @tailwindcss/vite postcss autoprefixer \
+            eslint prettier eslint-config-prettier \
+            eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y \
+            @typescript-eslint/parser @typescript-eslint/eslint-plugin \
+            lint-staged husky \
+            vitest @testing-library/react @testing-library/jest-dom \
+            shadcn
+
+      # 6) Write vite.config.ts (base path, Tailwind plugin, Vitest) 
       - name: Write vite.config.ts
         run: |
           cat > vite.config.ts << 'EOF'
-          import { defineConfig } from 'vite'
-          import react from '@vitejs/plugin-react'
-          import tailwindcss from '@tailwindcss/vite'
+          import { defineConfig } from 'vite';
+          import react from '@vitejs/plugin-react';
+          import tailwindcss from '@tailwindcss/vite';
 
           export default defineConfig({
             base: '/${{ github.event.repository.name }}/',
@@ -39,36 +60,45 @@ jobs:
               globals: true,
               environment: 'jsdom'
             }
-          })
+          });
           EOF
 
-      - name: Install dev dependencies
+      # 7) Manually create tailwind.config.js & postcss.config.js (no CLI) 
+      - name: Write Tailwind & PostCSS configs
         run: |
-          npm install -D \
-            tailwindcss postcss autoprefixer \
-            @tailwindcss/vite \
-            eslint prettier eslint-config-prettier \
-            eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y \
-            @typescript-eslint/parser @typescript-eslint/eslint-plugin \
-            lint-staged \
-            vitest @testing-library/react @testing-library/jest-dom \
-            shadcn
+          cat > tailwind.config.js << 'EOF'
+          /** @type {import('tailwindcss').Config'} */
+          export default {
+            content: [
+              'index.html',
+              'src/**/*.{js,ts,jsx,tsx}',
+              'components/**/*.{js,ts,jsx,tsx}'
+            ],
+            theme: { extend: {} },
+            plugins: []
+          };
+          EOF
 
-      - name: Initialize Tailwind
-        run: npx tailwindcss init -p
+          cat > postcss.config.js << 'EOF'
+          export default {
+            plugins: {
+              tailwindcss: {},
+              autoprefixer: {},
+            },
+          };
+          EOF
 
-      - name: Configure Tailwind content paths
+      # 8) Overwrite your main CSS to import Tailwind
+      - name: Create src/index.css
         run: |
-          sed -i "s|content: \\[\\]|content: ['index.html','src/**/*.{js,ts,jsx,tsx}','components/**/*.{js,ts,jsx,tsx}']|" tailwind.config.js
-
-      - name: Write src/index.css
-        run: |
+          mkdir -p src
           cat > src/index.css << 'EOF'
           @tailwind base;
           @tailwind components;
           @tailwind utilities;
           EOF
 
+      # 9) Drop in ESLint & Prettier configs
       - name: Write ESLint & Prettier config
         run: |
           cat > .eslintrc.json << 'EOF'
@@ -100,14 +130,25 @@ jobs:
           }
           EOF
 
-      - name: Configure test & lint scripts
+      # 10) Configure test & lint scripts
+      - name: Configure scripts
         run: |
           npm pkg set scripts.test="vitest"
           npm pkg set lint-staged='{"src/**/*.{js,ts,jsx,tsx}":["eslint --fix","prettier --write"]}'
+          npm pkg set scripts.prepare="husky"
 
-      - name: Init shadcn components
+      # 11) Modern Husky setup
+      - name: Setup Husky pre-commit hook
+        run: |
+          npm run prepare
+          printf "npx lint-staged\n" > .husky/pre-commit
+          chmod +x .husky/pre-commit
+
+      # 12) Initialize shadcn components (requires the TS alias below)
+      - name: Init shadcn/ui
         run: npx shadcn@latest init --yes
 
+      # 13) Add TS path alias for components
       - name: Add TS alias for components
         run: |
           node << 'EOF'
@@ -122,28 +163,28 @@ jobs:
           fs.writeFileSync('tsconfig.json', JSON.stringify(ts, null, 2));
           EOF
 
+      # 14) Commit all the scaffold/config back to main
       - name: Commit scaffold to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Initialize modern Vite+React+TS+Tailwind+ESLint+Vitest+shadcn" || echo "No changes to commit"
+          git commit -m "Initialize modern Vite+React+TS+Tailwind+ESLint+Vitest+Husky+shadcn" || echo "Nothing to commit"
           git push origin main
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build production bundle
+      # 15) Build & deploy
+      - name: Build prod bundle
         run: npm run build
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: ./dist
 
-      - name: Configure GitHub Pages
+      # 16) Enable GitHub Pages
+      - name: Enable GitHub Pages
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
