@@ -18,16 +18,15 @@ jobs:
         with:
           persist-credentials: true
 
-      # 2) Use Node 20+
+      # 2) Node 20+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # 3) Emit every source file by hand
+      # 3) Scaffold all files by hand
       - name: Scaffold project files
         run: |
-          # ─── package.json ────────────────────────────────
           cat > package.json << 'EOF'
           {
             "name": "${{ github.event.repository.name }}",
@@ -76,7 +75,6 @@ jobs:
           }
           EOF
 
-          # ─── .gitignore ─────────────────────────────────
           cat > .gitignore << 'EOF'
           node_modules/
           dist/
@@ -84,7 +82,6 @@ jobs:
           .env
           EOF
 
-          # ─── tsconfig.json ──────────────────────────────
           cat > tsconfig.json << 'EOF'
           {
             "compilerOptions": {
@@ -108,7 +105,6 @@ jobs:
           }
           EOF
 
-          # ─── vite.config.mts ────────────────────────────
           cat > vite.config.mts << 'EOF'
           import { defineConfig } from 'vite';
           import react from '@vitejs/plugin-react';
@@ -117,6 +113,9 @@ jobs:
           export default defineConfig({
             base: '/${{ github.event.repository.name }}/',
             plugins: [react(), tailwindcss()],
+            optimizeDeps: {
+              exclude: ['@tailwindcss/vite']
+            },
             test: {
               globals: true,
               environment: 'jsdom'
@@ -124,7 +123,6 @@ jobs:
           });
           EOF
 
-          # ─── tailwind.config.js ─────────────────────────
           cat > tailwind.config.js << 'EOF'
           /** @type {import('tailwindcss').Config} */
           export default {
@@ -138,7 +136,6 @@ jobs:
           };
           EOF
 
-          # ─── postcss.config.js ──────────────────────────
           cat > postcss.config.js << 'EOF'
           export default {
             plugins: {
@@ -148,7 +145,6 @@ jobs:
           };
           EOF
 
-          # ─── index.html ────────────────────────────────
           cat > index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
@@ -164,7 +160,6 @@ jobs:
           </html>
           EOF
 
-          # ─── src files ──────────────────────────────────
           mkdir -p src
           cat > src/index.css << 'EOF'
           @tailwind base;
@@ -197,7 +192,6 @@ jobs:
           }
           EOF
 
-          # ─── ESLint & Prettier ─────────────────────────
           cat > .eslintrc.json << 'EOF'
           {
             "root": true,
@@ -231,35 +225,35 @@ jobs:
       - name: Install dependencies & prepare
         run: npm install
 
-      # 5) Add our Husky pre-commit hook
+      # 5) Setup Husky pre-commit hook
       - name: Setup Husky pre-commit hook
         run: |
           printf "npx lint-staged\n" > .husky/pre-commit
           chmod +x .husky/pre-commit
 
-      # 6) Now that tsconfig alias exists, scaffold shadcn/ui
+      # 6) Scaffold shadcn/ui
       - name: Initialize shadcn/ui
         run: npx shadcn@latest init --yes
 
-      # 7) Commit the scaffold back to main
+      # 7) Commit scaffold back to main
       - name: Commit scaffold to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Scaffold full modern Vite+React+TS+Tailwind+ESLint+Vitest+Husky+shadcn" --no-verify || echo "Nothing to commit"
+          git commit -m "Scaffold modern Vite+React+TS stack" --no-verify || echo "Nothing to commit"
           git push origin main
 
-      # 8) Build for production
+      # 8) Build production bundle
       - name: Build production bundle
         run: npm run build
 
-      # 9) Upload artifact for Pages (replaces the deprecated actions/upload-artifact) :contentReference[oaicite:0]{index=0}
+      # 9) Upload Pages artifact
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
-      # 10) Deploy to GitHub Pages (latest v4) :contentReference[oaicite:1]{index=1}
+      # 10) Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
