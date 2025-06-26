@@ -8,27 +8,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Check out the repo (with creds to push later)
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           persist-credentials: true
 
-      # 2) Use Node 20+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # 3) Fetch Vite React TS template via degit (no auto-install, no prompts) :contentReference[oaicite:0]{index=0}
-      - name: Scaffold Vite + React TS
+      - name: Scaffold Vite + React TS (no auto-install)
         run: |
           npx degit vitejs/vite/packages/create-vite/template/react-ts temp-app
           cp -a temp-app/. .
           rm -rf temp-app
 
-      # 4) Write a custom vite.config.ts (GitHub-Pages base, Tailwind plugin, Vitest)
-      - name: Write vite.config.ts
+      - name: Write custom vite.config.ts
         run: |
           cat > vite.config.ts << 'EOF'
           import { defineConfig } from 'vite'
@@ -37,7 +33,10 @@ jobs:
 
           export default defineConfig({
             base: '/${{ github.event.repository.name }}/',
-            plugins: [react(), tailwindcss()],
+            plugins: [
+              react(),
+              tailwindcss()
+            ],
             test: {
               globals: true,
               environment: 'jsdom'
@@ -45,12 +44,10 @@ jobs:
           })
           EOF
 
-      # 5) Install all dev tooling in one shot
-      - name: Install dev dependencies
+      - name: Install dependencies
         run: |
           npm install -D \
-            tailwindcss postcss autoprefixer \
-            @tailwindcss/vite \
+            tailwindcss @tailwindcss/vite \
             eslint prettier eslint-config-prettier \
             eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y \
             @typescript-eslint/parser @typescript-eslint/eslint-plugin \
@@ -58,26 +55,14 @@ jobs:
             vitest @testing-library/react @testing-library/jest-dom \
             shadcn
 
-      # 6) Initialize Tailwind CSS (creates tailwind.config.js + postcss.config.js)
-      - name: Initialize Tailwind
-        run: npx tailwindcss init -p
-
-      # 7) Configure tailwind.config.js to scan src/ and components/
-      - name: Configure Tailwind content paths
+      - name: Create main CSS with Tailwind import
         run: |
-          sed -i "s|content: \\[\\]|content: ['index.html','src/**/*.{js,ts,jsx,tsx}','components/**/*.{js,ts,jsx,tsx}']|" tailwind.config.js
-
-      # 8) Overwrite main CSS entry with Tailwind imports
-      - name: Write src/index.css
-        run: |
+          mkdir -p src
           cat > src/index.css << 'EOF'
-          @tailwind base;
-          @tailwind components;
-          @tailwind utilities;
+          @import 'tailwindcss';
           EOF
 
-      # 9) Drop in ESLint & Prettier configs
-      - name: Write ESLint & Prettier config
+      - name: Write ESLint & Prettier configs
         run: |
           cat > .eslintrc.json << 'EOF'
           {
@@ -108,57 +93,48 @@ jobs:
           }
           EOF
 
-      # 10) Add Vitest & lint-staged scripts
       - name: Configure test & lint scripts
         run: |
           npm pkg set scripts.test="vitest"
           npm pkg set lint-staged='{"src/**/*.{js,ts,jsx,tsx}":["eslint --fix","prettier --write"]}'
 
-      # 11) Modern Husky setup
-      - name: Setup Husky & pre-commit hook
+      - name: Modern Husky setup
         run: |
           npm pkg set scripts.prepare="husky"
           npm run prepare
           printf "npx lint-staged\n" > .husky/pre-commit
           chmod +x .husky/pre-commit
 
-      # 12) Initialize shadcn components
-      - name: Init shadcn/ui
+      - name: Initialize shadcn/ui
         run: npx shadcn@latest init --yes
 
-      # 13) Add TS path alias for components
       - name: Add TS alias for components
         run: |
           node << 'EOF'
-          const fs = require('fs');
-          const ts = JSON.parse(fs.readFileSync('tsconfig.json'));
-          ts.compilerOptions = ts.compilerOptions || {};
-          ts.compilerOptions.baseUrl = '.';
-          ts.compilerOptions.paths = ts.compilerOptions.paths || {};
-          ts.compilerOptions.paths['@/components/*'] = ['components/*'];
-          ts.include = ts.include || [];
-          if (!ts.include.includes('components')) ts.include.push('components');
-          fs.writeFileSync('tsconfig.json', JSON.stringify(ts, null, 2));
+          const fs = require('fs')
+          const ts = JSON.parse(fs.readFileSync('tsconfig.json'))
+          ts.compilerOptions = ts.compilerOptions || {}
+          ts.compilerOptions.baseUrl = '.'
+          ts.compilerOptions.paths = ts.compilerOptions.paths || {}
+          ts.compilerOptions.paths['@/components/*'] = ['components/*']
+          ts.include = ts.include || []
+          if (!ts.include.includes('components')) ts.include.push('components')
+          fs.writeFileSync('tsconfig.json', JSON.stringify(ts, null, 2))
           EOF
 
-      # 14) Commit the scaffold back to main
       - name: Commit scaffold to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Initialize modern Vite+React+TS+Tailwind+ESLint+Vitest+Husky+shadcn" || echo "No changes to commit"
+          git commit -m "Initialize modern Vite+React+TS+Tailwind v4+ESLint+Vitest+Husky+shadcn" || echo "No changes to commit"
           git push origin main
 
-      # 15) Install all deps (including shadcn UI + tailwind etc.)
-      - name: Install dependencies
-        run: npm install
-
-      # 16) Build for production
       - name: Build production bundle
-        run: npm run build
+        run: |
+          npm install
+          npm run build
 
-      # 17) Deploy to gh-pages branch
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
@@ -166,8 +142,7 @@ jobs:
           publish_branch: gh-pages
           publish_dir: ./dist
 
-      # 18) Auto-enable GitHub Pages to serve from gh-pages
-      - name: Configure GitHub Pages
+      - name: Enable GitHub Pages
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
