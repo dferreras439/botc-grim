@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # needed to push the gh-pages branch
-  pages: write      # needed by the deploy-pages action
+  contents: write   # for pushing gh-pages
+  pages: write      # for deploying via deploy-pages
 
 jobs:
   scaffold-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Checkout (with push credentials)
+      # 1) Checkout with push credentials
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -24,10 +24,10 @@ jobs:
         with:
           node-version: '20'
 
-      # 3) Scaffold every file by hand
+      # 3) Emit every source file by hand
       - name: Scaffold project files
         run: |
-          # ─── package.json ───────────────────────────────────────────────
+          # package.json
           cat > package.json << 'EOF'
           {
             "name": "${{ github.event.repository.name }}",
@@ -77,14 +77,14 @@ jobs:
           }
           EOF
 
-          # ─── .gitignore ───────────────────────────────────────────────────
+          # .gitignore
           cat > .gitignore << 'EOF'
           node_modules/
           dist/
           .DS_Store
           EOF
 
-          # ─── tsconfig.json ────────────────────────────────────────────────
+          # tsconfig.json
           cat > tsconfig.json << 'EOF'
           {
             "compilerOptions": {
@@ -108,7 +108,7 @@ jobs:
           }
           EOF
 
-          # ─── vite.config.mjs ─────────────────────────────────────────────
+          # vite.config.mjs (ESM) so @tailwindcss/vite works :contentReference[oaicite:2]{index=2}
           cat > vite.config.mjs << 'EOF'
           import { defineConfig } from 'vite';
           import react from '@vitejs/plugin-react';
@@ -124,7 +124,7 @@ jobs:
           });
           EOF
 
-          # ─── tailwind.config.js ──────────────────────────────────────────
+          # tailwind.config.js
           cat > tailwind.config.js << 'EOF'
           /** @type {import('tailwindcss').Config} */
           module.exports = {
@@ -138,17 +138,17 @@ jobs:
           };
           EOF
 
-          # ─── postcss.config.cjs ───────────────────────────────────────────
-          cat > postcss.config.cjs << 'EOF'
+          # postcss.config.js with the new plugin :contentReference[oaicite:3]{index=3}
+          cat > postcss.config.js << 'EOF'
           module.exports = {
             plugins: {
-              '@tailwindcss/postcss': {},    # use the new PostCSS plugin :contentReference[oaicite:0]{index=0}
+              '@tailwindcss/postcss': {},
               autoprefixer: {}
             }
           };
           EOF
 
-          # ─── index.html ──────────────────────────────────────────────────
+          # index.html
           cat > index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
@@ -164,7 +164,7 @@ jobs:
           </html>
           EOF
 
-          # ─── src files ────────────────────────────────────────────────────
+          # src/
           mkdir -p src
           cat > src/index.css << 'EOF'
           @tailwind base;
@@ -197,7 +197,7 @@ jobs:
           }
           EOF
 
-          # ─── ESLint & Prettier configs ────────────────────────────────────
+          # ESLint & Prettier
           cat > .eslintrc.json << 'EOF'
           {
             "root": true,
@@ -227,17 +227,17 @@ jobs:
           }
           EOF
 
-      # 4) Install & prepare (this runs `prepare` and sets up Husky)
+      # 4) Install & run 'prepare' to set up Husky
       - name: Install dependencies & prepare
         run: npm install
 
-      # 5) Set up our Husky pre-commit hook
-      - name: Husky pre-commit hook
+      # 5) Husky pre-commit hook for lint-staged
+      - name: Setup Husky pre-commit hook
         run: |
           printf "npx lint-staged\n" > .husky/pre-commit
           chmod +x .husky/pre-commit
 
-      # 6) Initialize shadcn/ui (TS alias already in place)
+      # 6) Initialize shadcn/ui (uses the TS alias)
       - name: Initialize shadcn/ui
         run: npx shadcn@latest init --yes
 
@@ -254,12 +254,11 @@ jobs:
       - name: Build production bundle
         run: npm run build
 
-      # 9) Upload Pages artifact via the official action
+      # 9) Upload Pages artifact (non-deprecated) and deploy
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
-      # 10) Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
