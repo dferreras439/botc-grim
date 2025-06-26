@@ -1,4 +1,4 @@
-name: Scaffold & Deploy Modern Vite React → GitHub Pages
+name: 🚀 Scaffold & Deploy Modern Vite React → GitHub Pages
 
 on:
   workflow_dispatch:
@@ -12,42 +12,103 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Checkout (with push perms)
-      - uses: actions/checkout@v3
+      # 1) Check out (with push perms)
+      - name: Checkout repository
+        uses: actions/checkout@v3
         with:
           persist-credentials: true
 
-      # 2) Node 20+
-      - uses: actions/setup-node@v3
+      # 2) Install Node 20+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # 3) Fetch Vite React TS via degit (just files, no install) 
-      - name: Scaffold Vite + React TS
+      # 3) Emit every file by hand (package.json, tsconfig, vite.config, tailwind, postcss, src/, etc.)
+      - name: Scaffold project files
         run: |
-          npx degit vitejs/vite/packages/create-vite/template/react-ts temp-app
-          cp -a temp-app/. .
-          rm -rf temp-app
+          # ─── package.json ────────────────────────────────────────────────────
+          cat > package.json << 'EOF'
+          {
+            "name": "${{ github.event.repository.name }}",
+            "version": "0.0.1",
+            "private": true,
+            "scripts": {
+              "dev": "vite",
+              "build": "vite build",
+              "preview": "vite preview",
+              "test": "vitest",
+              "prepare": "husky install"
+            },
+            "dependencies": {
+              "react": "^18.2.0",
+              "react-dom": "^18.2.0"
+            },
+            "devDependencies": {
+              "vite": "*",
+              "@vitejs/plugin-react": "*",
+              "typescript": "*",
+              "tailwindcss": "*",
+              "@tailwindcss/vite": "*",
+              "postcss": "*",
+              "autoprefixer": "*",
+              "eslint": "*",
+              "eslint-config-prettier": "*",
+              "eslint-plugin-react": "*",
+              "eslint-plugin-react-hooks": "*",
+              "eslint-plugin-jsx-a11y": "*",
+              "@typescript-eslint/parser": "*",
+              "@typescript-eslint/eslint-plugin": "*",
+              "prettier": "*",
+              "vitest": "*",
+              "@testing-library/react": "*",
+              "@testing-library/jest-dom": "*",
+              "husky": "*",
+              "lint-staged": "*",
+              "shadcn": "*"
+            },
+            "lint-staged": {
+              "src/**/*.{js,ts,jsx,tsx}": [
+                "eslint --fix",
+                "prettier --write"
+              ]
+            }
+          }
+          EOF
 
-      # 4) Install your app’s dependencies
-      - name: Install dependencies
-        run: npm install
+          # ─── .gitignore ───────────────────────────────────────────────────────
+          cat > .gitignore << 'EOF'
+          node_modules/
+          dist/
+          .DS_Store
+          .env
+          EOF
 
-      # 5) Add dev-tooling: Tailwind v4 plugin, ESLint, Prettier, Vitest, Husky, shadcn
-      - name: Install dev dependencies
-        run: |
-          npm install -D \
-            tailwindcss @tailwindcss/vite postcss autoprefixer \
-            eslint prettier eslint-config-prettier \
-            eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y \
-            @typescript-eslint/parser @typescript-eslint/eslint-plugin \
-            lint-staged husky \
-            vitest @testing-library/react @testing-library/jest-dom \
-            shadcn
+          # ─── tsconfig.json ───────────────────────────────────────────────────
+          cat > tsconfig.json << 'EOF'
+          {
+            "compilerOptions": {
+              "target": "ESNext",
+              "useDefineForClassFields": true,
+              "lib": ["DOM","DOM.Iterable","ESNext"],
+              "skipLibCheck": true,
+              "strict": true,
+              "module": "ESNext",
+              "moduleResolution": "Node",
+              "resolveJsonModule": true,
+              "isolatedModules": true,
+              "noEmit": true,
+              "jsx": "react-jsx",
+              "baseUrl": ".",
+              "paths": {
+                "@/components/*": ["components/*"]
+              }
+            },
+            "include": ["src","components"]
+          }
+          EOF
 
-      # 6) Write vite.config.ts (base path, Tailwind plugin, Vitest) 
-      - name: Write vite.config.ts
-        run: |
+          # ─── vite.config.ts ──────────────────────────────────────────────────
           cat > vite.config.ts << 'EOF'
           import { defineConfig } from 'vite';
           import react from '@vitejs/plugin-react';
@@ -63,11 +124,9 @@ jobs:
           });
           EOF
 
-      # 7) Manually create tailwind.config.js & postcss.config.js (no CLI) 
-      - name: Write Tailwind & PostCSS configs
-        run: |
+          # ─── tailwind.config.js ──────────────────────────────────────────────
           cat > tailwind.config.js << 'EOF'
-          /** @type {import('tailwindcss').Config'} */
+          /** @type {import('tailwindcss').Config} */
           export default {
             content: [
               'index.html',
@@ -79,18 +138,34 @@ jobs:
           };
           EOF
 
+          # ─── postcss.config.js ───────────────────────────────────────────────
           cat > postcss.config.js << 'EOF'
           export default {
             plugins: {
               tailwindcss: {},
-              autoprefixer: {},
-            },
+              autoprefixer: {}
+            }
           };
           EOF
 
-      # 8) Overwrite your main CSS to import Tailwind
-      - name: Create src/index.css
-        run: |
+          # ─── index.html ──────────────────────────────────────────────────────
+          cat > index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <link rel="icon" href="/favicon.ico" />
+              <title>Vite + React + TS</title>
+            </head>
+            <body>
+              <div id="root"></div>
+              <script type="module" src="/src/main.tsx"></script>
+            </body>
+          </html>
+          EOF
+
+          # ─── src files ────────────────────────────────────────────────────────
           mkdir -p src
           cat > src/index.css << 'EOF'
           @tailwind base;
@@ -98,99 +173,72 @@ jobs:
           @tailwind utilities;
           EOF
 
-      # 9) Drop in ESLint & Prettier configs
-      - name: Write ESLint & Prettier config
-        run: |
-          cat > .eslintrc.json << 'EOF'
-          {
-            "root": true,
-            "parser": "@typescript-eslint/parser",
-            "parserOptions": {
-              "ecmaVersion": 2020,
-              "sourceType": "module",
-              "ecmaFeatures": { "jsx": true }
-            },
-            "plugins": ["react","react-hooks","@typescript-eslint"],
-            "extends": [
-              "eslint:recommended",
-              "plugin:react/recommended",
-              "plugin:@typescript-eslint/recommended",
-              "prettier"
-            ],
-            "settings": { "react": { "version": "detect" } },
-            "rules": {}
+          cat > src/main.tsx << 'EOF'
+          import React from 'react';
+          import ReactDOM from 'react-dom/client';
+          import App from './App';
+          import './index.css';
+
+          ReactDOM.createRoot(document.getElementById('root')!).render(
+            <React.StrictMode>
+              <App />
+            </React.StrictMode>
+          );
+          EOF
+
+          cat > src/App.tsx << 'EOF'
+          import React from 'react';
+
+          export default function App() {
+            return (
+              <div className="min-h-screen flex items-center justify-center">
+                <h1 className="text-4xl font-bold">Hello, World!</h1>
+              </div>
+            );
           }
           EOF
 
-          cat > .prettierrc << 'EOF'
-          {
-            "semi": true,
-            "singleQuote": true,
-            "printWidth": 80
-          }
-          EOF
+      # 4) Install everything (runs `prepare` → sets up Husky)
+      - name: Install dependencies
+        run: npm install
 
-      # 10) Configure test & lint scripts
-      - name: Configure scripts
-        run: |
-          npm pkg set scripts.test="vitest"
-          npm pkg set lint-staged='{"src/**/*.{js,ts,jsx,tsx}":["eslint --fix","prettier --write"]}'
-          npm pkg set scripts.prepare="husky"
-
-      # 11) Modern Husky setup
+      # 5) Add our Husky pre-commit hook
       - name: Setup Husky pre-commit hook
         run: |
-          npm run prepare
+          # `prepare` script already ran on npm install, so .husky/ exists
           printf "npx lint-staged\n" > .husky/pre-commit
           chmod +x .husky/pre-commit
 
-      # 12) Initialize shadcn components (requires the TS alias below)
-      - name: Init shadcn/ui
+      # 6) Now that tsconfig has our alias, scaffold shadcn/ui
+      - name: Initialize shadcn/ui
         run: npx shadcn@latest init --yes
 
-      # 13) Add TS path alias for components
-      - name: Add TS alias for components
-        run: |
-          node << 'EOF'
-          const fs = require('fs');
-          const ts = JSON.parse(fs.readFileSync('tsconfig.json'));
-          ts.compilerOptions = ts.compilerOptions || {};
-          ts.compilerOptions.baseUrl = '.';
-          ts.compilerOptions.paths = ts.compilerOptions.paths || {};
-          ts.compilerOptions.paths['@/components/*'] = ['components/*'];
-          ts.include = ts.include || [];
-          if (!ts.include.includes('components')) ts.include.push('components');
-          fs.writeFileSync('tsconfig.json', JSON.stringify(ts, null, 2));
-          EOF
-
-      # 14) Commit all the scaffold/config back to main
+      # 7) Commit the freshly-scaffolded app
       - name: Commit scaffold to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Initialize modern Vite+React+TS+Tailwind+ESLint+Vitest+Husky+shadcn" || echo "Nothing to commit"
+          git commit -m "Scaffold full modern stack" --no-verify || echo "Nothing to commit"
           git push origin main
 
-      # 15) Build & deploy
-      - name: Build prod bundle
+      # 8) Build & deploy
+      - name: Build production bundle
         run: npm run build
 
-      - name: Deploy to gh-pages
+      - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: ./dist
 
-      # 16) Enable GitHub Pages
+      # 9) Enable Pages via API
       - name: Enable GitHub Pages
         if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           curl -X PUT \
-            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.switcheroo-preview+json" \
             https://api.github.com/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/pages \
             -d '{"source":{"branch":"gh-pages","path":"/"}}'
