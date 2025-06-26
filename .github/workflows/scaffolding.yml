@@ -20,8 +20,8 @@ jobs:
 
       - name: Scaffold Vite + React TS + Tailwind + ESLint + Vitest + Husky + shadcn
         run: |
-          # 1) Bootstrap Vite React TS
-          npx create-vite@latest temp-app --template react-ts --yes
+          # 1) Bootstrap Vite React TS without installing deps
+          npx create-vite@latest temp-app --template react-ts --yes --no-install
 
           # 2) Move scaffold into repo root
           cp -a temp-app/. .
@@ -43,8 +43,7 @@ jobs:
           })
           EOF
 
-          # 4) Install TailwindCSS, its PostCSS deps, Tailwind Vite plugin,
-          #    ESLint, Prettier, lint-staged, Husky, Vitest, Testing Library, shadcn
+          # 4) Install TailwindCSS, PostCSS, Tailwind Vite plugin, ESLint, Prettier, lint-staged, Husky, Vitest, Testing Library, shadcn
           npm install -D \
             tailwindcss postcss autoprefixer \
             @tailwindcss/vite \
