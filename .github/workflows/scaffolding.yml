@@ -6,6 +6,7 @@ on:
 permissions:
   contents: write
   pages: write
+  administration: write
 
 jobs:
   scaffold-and-deploy:
@@ -27,7 +28,7 @@ jobs:
       # 3) Emit every file by hand (package.json, tsconfig, vite.config, tailwind, postcss, src/, etc.)
       - name: Scaffold project files
         run: |
-          # ─── package.json ────────────────────────────────────────────────────
+          # ─── package.json ────────────────────────────────────────────────
           cat > package.json << 'EOF'
           {
             "name": "${{ github.event.repository.name }}",
@@ -76,7 +77,7 @@ jobs:
           }
           EOF
 
-          # ─── .gitignore ───────────────────────────────────────────────────────
+          # ─── .gitignore ──────────────────────────────────────────────────
           cat > .gitignore << 'EOF'
           node_modules/
           dist/
@@ -84,7 +85,7 @@ jobs:
           .env
           EOF
 
-          # ─── tsconfig.json ───────────────────────────────────────────────────
+          # ─── tsconfig.json ───────────────────────────────────────────────
           cat > tsconfig.json << 'EOF'
           {
             "compilerOptions": {
@@ -108,8 +109,8 @@ jobs:
           }
           EOF
 
-          # ─── vite.config.ts ──────────────────────────────────────────────────
-          cat > vite.config.ts << 'EOF'
+          # ─── vite.config.mts ─────────────────────────────────────────────
+          cat > vite.config.mts << 'EOF'
           import { defineConfig } from 'vite';
           import react from '@vitejs/plugin-react';
           import tailwindcss from '@tailwindcss/vite';
@@ -124,7 +125,7 @@ jobs:
           });
           EOF
 
-          # ─── tailwind.config.js ──────────────────────────────────────────────
+          # ─── tailwind.config.js ──────────────────────────────────────────
           cat > tailwind.config.js << 'EOF'
           /** @type {import('tailwindcss').Config} */
           export default {
@@ -138,7 +139,7 @@ jobs:
           };
           EOF
 
-          # ─── postcss.config.js ───────────────────────────────────────────────
+          # ─── postcss.config.js ───────────────────────────────────────────
           cat > postcss.config.js << 'EOF'
           export default {
             plugins: {
@@ -148,7 +149,7 @@ jobs:
           };
           EOF
 
-          # ─── index.html ──────────────────────────────────────────────────────
+          # ─── index.html ──────────────────────────────────────────────────
           cat > index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
@@ -165,7 +166,7 @@ jobs:
           </html>
           EOF
 
-          # ─── src files ────────────────────────────────────────────────────────
+          # ─── src files ────────────────────────────────────────────────────
           mkdir -p src
           cat > src/index.css << 'EOF'
           @tailwind base;
@@ -198,6 +199,36 @@ jobs:
           }
           EOF
 
+          # ─── ESLint & Prettier ────────────────────────────────────────────
+          cat > .eslintrc.json << 'EOF'
+          {
+            "root": true,
+            "parser": "@typescript-eslint/parser",
+            "parserOptions": {
+              "ecmaVersion": 2020,
+              "sourceType": "module",
+              "ecmaFeatures": { "jsx": true }
+            },
+            "plugins": ["react","react-hooks","@typescript-eslint"],
+            "extends": [
+              "eslint:recommended",
+              "plugin:react/recommended",
+              "plugin:@typescript-eslint/recommended",
+              "prettier"
+            ],
+            "settings": { "react": { "version": "detect" } },
+            "rules": {}
+          }
+          EOF
+
+          cat > .prettierrc << 'EOF'
+          {
+            "semi": true,
+            "singleQuote": true,
+            "printWidth": 80
+          }
+          EOF
+
       # 4) Install everything (runs `prepare` → sets up Husky)
       - name: Install dependencies
         run: npm install
@@ -205,7 +236,6 @@ jobs:
       # 5) Add our Husky pre-commit hook
       - name: Setup Husky pre-commit hook
         run: |
-          # `prepare` script already ran on npm install, so .husky/ exists
           printf "npx lint-staged\n" > .husky/pre-commit
           chmod +x .husky/pre-commit
 
@@ -238,7 +268,7 @@ jobs:
         if: always()
         run: |
           curl -X PUT \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.switcheroo-preview+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
             https://api.github.com/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/pages \
             -d '{"source":{"branch":"gh-pages","path":"/"}}'
