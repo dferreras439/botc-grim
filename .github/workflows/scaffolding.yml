@@ -4,30 +4,30 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # for pushing gh-pages
-  pages: write      # for deploying via deploy-pages
+  contents: write   # for pushing the gh-pages branch
+  pages: write      # for deploying via actions/deploy-pages
+  id-token: write   # required to request the OIDC token for pages deployment
 
 jobs:
   scaffold-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Checkout with push credentials
+      # 1) Checkout (with push creds)
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           persist-credentials: true
 
-      # 2) Use Node.js 20+
+      # 2) Setup Node.js 20+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # 3) Emit every source file by hand
+      # 3) Scaffold every file by hand
       - name: Scaffold project files
         run: |
-          # package.json
           cat > package.json << 'EOF'
           {
             "name": "${{ github.event.repository.name }}",
@@ -77,14 +77,12 @@ jobs:
           }
           EOF
 
-          # .gitignore
           cat > .gitignore << 'EOF'
           node_modules/
           dist/
           .DS_Store
           EOF
 
-          # tsconfig.json
           cat > tsconfig.json << 'EOF'
           {
             "compilerOptions": {
@@ -108,7 +106,6 @@ jobs:
           }
           EOF
 
-          # vite.config.mjs (ESM) so @tailwindcss/vite works :contentReference[oaicite:2]{index=2}
           cat > vite.config.mjs << 'EOF'
           import { defineConfig } from 'vite';
           import react from '@vitejs/plugin-react';
@@ -124,7 +121,6 @@ jobs:
           });
           EOF
 
-          # tailwind.config.js
           cat > tailwind.config.js << 'EOF'
           /** @type {import('tailwindcss').Config} */
           module.exports = {
@@ -138,7 +134,6 @@ jobs:
           };
           EOF
 
-          # postcss.config.js with the new plugin :contentReference[oaicite:3]{index=3}
           cat > postcss.config.js << 'EOF'
           module.exports = {
             plugins: {
@@ -148,7 +143,6 @@ jobs:
           };
           EOF
 
-          # index.html
           cat > index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
@@ -164,7 +158,6 @@ jobs:
           </html>
           EOF
 
-          # src/
           mkdir -p src
           cat > src/index.css << 'EOF'
           @tailwind base;
@@ -197,7 +190,6 @@ jobs:
           }
           EOF
 
-          # ESLint & Prettier
           cat > .eslintrc.json << 'EOF'
           {
             "root": true,
@@ -227,17 +219,17 @@ jobs:
           }
           EOF
 
-      # 4) Install & run 'prepare' to set up Husky
+      # 4) Install & prepare (runs "prepare" to set up Husky)
       - name: Install dependencies & prepare
         run: npm install
 
-      # 5) Husky pre-commit hook for lint-staged
-      - name: Setup Husky pre-commit hook
+      # 5) Setup Husky pre-commit hook
+      - name: Husky pre-commit hook
         run: |
           printf "npx lint-staged\n" > .husky/pre-commit
           chmod +x .husky/pre-commit
 
-      # 6) Initialize shadcn/ui (uses the TS alias)
+      # 6) Initialize shadcn/ui
       - name: Initialize shadcn/ui
         run: npx shadcn@latest init --yes
 
@@ -250,15 +242,16 @@ jobs:
           git commit -m "Scaffold full modern Vite+React+TS+Tailwind+ESLint+Vitest+Husky+shadcn" --no-verify || echo "Nothing to commit"
           git push origin main
 
-      # 8) Build for production
+      # 8) Build production bundle
       - name: Build production bundle
         run: npm run build
 
-      # 9) Upload Pages artifact (non-deprecated) and deploy
+      # 9) Upload the site as a Pages artifact
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
+      # 10) Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
