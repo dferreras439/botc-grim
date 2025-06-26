@@ -1,0 +1,45 @@
+{
+  "name": "botc-grim",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "prepare": "husky install"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "vite": "*",
+    "@vitejs/plugin-react": "*",
+    "typescript": "*",
+    "tailwindcss": "*",
+    "@tailwindcss/vite": "*",
+    "postcss": "*",
+    "autoprefixer": "*",
+    "eslint": "*",
+    "eslint-config-prettier": "*",
+    "eslint-plugin-react": "*",
+    "eslint-plugin-react-hooks": "*",
+    "eslint-plugin-jsx-a11y": "*",
+    "@typescript-eslint/parser": "*",
+    "@typescript-eslint/eslint-plugin": "*",
+    "prettier": "*",
+    "vitest": "*",
+    "@testing-library/react": "*",
+    "@testing-library/jest-dom": "*",
+    "husky": "*",
+    "lint-staged": "*",
+    "shadcn": "*"
+  },
+  "lint-staged": {
+    "src/**/*.{js,ts,jsx,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  }
+}
