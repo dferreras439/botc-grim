@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # for pushing gh-pages branch
-  pages: write      # for deploying via deploy-pages action
+  contents: write   # needed to push the gh-pages branch
+  pages: write      # needed by the deploy-pages action
 
 jobs:
   scaffold-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Checkout (with push creds)
+      # 1) Checkout (with push credentials)
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '20'
 
-      # 3) Emit every file by hand (package.json, gitignore, tsconfig, configs, src/, etc.)
+      # 3) Scaffold every file by hand
       - name: Scaffold project files
         run: |
           # ─── package.json ───────────────────────────────────────────────
@@ -50,6 +50,7 @@ jobs:
               "typescript": "*",
               "tailwindcss": "*",
               "@tailwindcss/vite": "*",
+              "@tailwindcss/postcss": "*",
               "postcss": "*",
               "autoprefixer": "*",
               "eslint": "*",
@@ -141,7 +142,7 @@ jobs:
           cat > postcss.config.cjs << 'EOF'
           module.exports = {
             plugins: {
-              tailwindcss: {},
+              '@tailwindcss/postcss': {},    # use the new PostCSS plugin :contentReference[oaicite:0]{index=0}
               autoprefixer: {}
             }
           };
@@ -154,7 +155,6 @@ jobs:
             <head>
               <meta charset="UTF-8" />
               <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <link rel="icon" href="/favicon.ico" />
               <title>Vite + React + TS</title>
             </head>
             <body>
@@ -197,7 +197,7 @@ jobs:
           }
           EOF
 
-          # ─── ESLint & Prettier configs ───────────────────────────────────
+          # ─── ESLint & Prettier configs ────────────────────────────────────
           cat > .eslintrc.json << 'EOF'
           {
             "root": true,
@@ -227,21 +227,21 @@ jobs:
           }
           EOF
 
-      # 4) Install & run "prepare" to set up Husky
+      # 4) Install & prepare (this runs `prepare` and sets up Husky)
       - name: Install dependencies & prepare
         run: npm install
 
-      # 5) Add our Husky pre-commit hook
-      - name: Setup Husky pre-commit hook
+      # 5) Set up our Husky pre-commit hook
+      - name: Husky pre-commit hook
         run: |
           printf "npx lint-staged\n" > .husky/pre-commit
           chmod +x .husky/pre-commit
 
-      # 6) Scaffold shadcn/ui (uses the tsconfig alias)
+      # 6) Initialize shadcn/ui (TS alias already in place)
       - name: Initialize shadcn/ui
         run: npx shadcn@latest init --yes
 
-      # 7) Commit the scaffold back to main
+      # 7) Commit scaffold back to main
       - name: Commit scaffold to main
         run: |
           git config user.name "github-actions[bot]"
@@ -254,7 +254,7 @@ jobs:
       - name: Build production bundle
         run: npm run build
 
-      # 9) Upload the site as a Pages artifact
+      # 9) Upload Pages artifact via the official action
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
