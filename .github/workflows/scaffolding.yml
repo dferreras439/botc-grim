@@ -8,26 +8,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1) Check out the repo (with creds to push later)
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           persist-credentials: true
 
+      # 2) Use Node 20+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      - name: Scaffold Vite + React TS + Tailwind + ESLint + Vitest + Husky + shadcn
+      # 3) Fetch Vite React TS template via degit (no auto-install, no prompts) :contentReference[oaicite:0]{index=0}
+      - name: Scaffold Vite + React TS
         run: |
-          # 1) Bootstrap Vite React TS WITHOUT running installs or dev
-          npm init vite@latest temp-app -- --template react-ts --yes --no-install
-
-          # 2) Move scaffold into your repo root
+          npx degit vitejs/vite/packages/create-vite/template/react-ts temp-app
           cp -a temp-app/. .
           rm -rf temp-app
 
-          # 3) Write a custom vite.config.ts (GH-Pages base, Tailwind plugin, Vitest)
+      # 4) Write a custom vite.config.ts (GitHub-Pages base, Tailwind plugin, Vitest)
+      - name: Write vite.config.ts
+        run: |
           cat > vite.config.ts << 'EOF'
           import { defineConfig } from 'vite'
           import react from '@vitejs/plugin-react'
@@ -43,7 +45,9 @@ jobs:
           })
           EOF
 
-          # 4) Install everything: Tailwind/PostCSS, ESLint/Prettier, Husky, Vitest, shadcn
+      # 5) Install all dev tooling in one shot
+      - name: Install dev dependencies
+        run: |
           npm install -D \
             tailwindcss postcss autoprefixer \
             @tailwindcss/vite \
@@ -54,20 +58,27 @@ jobs:
             vitest @testing-library/react @testing-library/jest-dom \
             shadcn
 
-          # 5) Init Tailwind config & PostCSS
-          npx tailwindcss init -p
+      # 6) Initialize Tailwind CSS (creates tailwind.config.js + postcss.config.js)
+      - name: Initialize Tailwind
+        run: npx tailwindcss init -p
 
-          # 6) Tweak Tailwind to scan your src/ + components/
+      # 7) Configure tailwind.config.js to scan src/ and components/
+      - name: Configure Tailwind content paths
+        run: |
           sed -i "s|content: \\[\\]|content: ['index.html','src/**/*.{js,ts,jsx,tsx}','components/**/*.{js,ts,jsx,tsx}']|" tailwind.config.js
 
-          # 7) Overwrite your main CSS to import Tailwind
+      # 8) Overwrite main CSS entry with Tailwind imports
+      - name: Write src/index.css
+        run: |
           cat > src/index.css << 'EOF'
           @tailwind base;
           @tailwind components;
           @tailwind utilities;
           EOF
 
-          # 8) Drop in basic ESLint & Prettier configs
+      # 9) Drop in ESLint & Prettier configs
+      - name: Write ESLint & Prettier config
+        run: |
           cat > .eslintrc.json << 'EOF'
           {
             "root": true,
@@ -97,20 +108,27 @@ jobs:
           }
           EOF
 
-          # 9) Add Vitest & lint-staged scripts to package.json
+      # 10) Add Vitest & lint-staged scripts
+      - name: Configure test & lint scripts
+        run: |
           npm pkg set scripts.test="vitest"
           npm pkg set lint-staged='{"src/**/*.{js,ts,jsx,tsx}":["eslint --fix","prettier --write"]}'
 
-          # 10) Setup Husky the “modern” way
+      # 11) Modern Husky setup
+      - name: Setup Husky & pre-commit hook
+        run: |
           npm pkg set scripts.prepare="husky"
           npm run prepare
           printf "npx lint-staged\n" > .husky/pre-commit
           chmod +x .husky/pre-commit
 
-          # 11) Scaffold shadcn components
-          npx shadcn@latest init --yes
+      # 12) Initialize shadcn components
+      - name: Init shadcn/ui
+        run: npx shadcn@latest init --yes
 
-          # 12) Add TS path alias for components in tsconfig.json
+      # 13) Add TS path alias for components
+      - name: Add TS alias for components
+        run: |
           node << 'EOF'
           const fs = require('fs');
           const ts = JSON.parse(fs.readFileSync('tsconfig.json'));
@@ -123,20 +141,24 @@ jobs:
           fs.writeFileSync('tsconfig.json', JSON.stringify(ts, null, 2));
           EOF
 
+      # 14) Commit the scaffold back to main
       - name: Commit scaffold to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Initialize modern Vite+React+TS+Tailwind+ESLint+Vitest+Husky+shadcn" || echo "No changes"
+          git commit -m "Initialize modern Vite+React+TS+Tailwind+ESLint+Vitest+Husky+shadcn" || echo "No changes to commit"
           git push origin main
 
+      # 15) Install all deps (including shadcn UI + tailwind etc.)
       - name: Install dependencies
         run: npm install
 
+      # 16) Build for production
       - name: Build production bundle
         run: npm run build
 
+      # 17) Deploy to gh-pages branch
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
@@ -144,6 +166,7 @@ jobs:
           publish_branch: gh-pages
           publish_dir: ./dist
 
+      # 18) Auto-enable GitHub Pages to serve from gh-pages
       - name: Configure GitHub Pages
         if: always()
         env:
