@@ -3,6 +3,10 @@ name: Scaffold & Deploy Modern Vite React → GitHub Pages
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pages: write
+
 jobs:
   scaffold-and-deploy:
     runs-on: ubuntu-latest
@@ -33,10 +37,7 @@ jobs:
 
           export default defineConfig({
             base: '/${{ github.event.repository.name }}/',
-            plugins: [
-              react(),
-              tailwindcss()
-            ],
+            plugins: [react(), tailwindcss()],
             test: {
               globals: true,
               environment: 'jsdom'
@@ -44,10 +45,11 @@ jobs:
           })
           EOF
 
-      - name: Install dependencies
+      - name: Install dev dependencies
         run: |
           npm install -D \
-            tailwindcss @tailwindcss/vite \
+            tailwindcss postcss autoprefixer \
+            @tailwindcss/vite \
             eslint prettier eslint-config-prettier \
             eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y \
             @typescript-eslint/parser @typescript-eslint/eslint-plugin \
@@ -55,11 +57,20 @@ jobs:
             vitest @testing-library/react @testing-library/jest-dom \
             shadcn
 
+      - name: Initialize Tailwind CSS
+        run: npx tailwindcss init -p
+
+      - name: Configure Tailwind content paths
+        run: |
+          sed -i "s|content: \\[\\]|content: ['index.html','src/**/*.{js,ts,jsx,tsx}','components/**/*.{js,ts,jsx,tsx}']|" tailwind.config.js
+
       - name: Create main CSS with Tailwind import
         run: |
           mkdir -p src
           cat > src/index.css << 'EOF'
-          @import 'tailwindcss';
+          @tailwind base;
+          @tailwind components;
+          @tailwind utilities;
           EOF
 
       - name: Write ESLint & Prettier configs
@@ -105,9 +116,6 @@ jobs:
           printf "npx lint-staged\n" > .husky/pre-commit
           chmod +x .husky/pre-commit
 
-      - name: Initialize shadcn/ui
-        run: npx shadcn@latest init --yes
-
       - name: Add TS alias for components
         run: |
           node << 'EOF'
@@ -122,12 +130,15 @@ jobs:
           fs.writeFileSync('tsconfig.json', JSON.stringify(ts, null, 2))
           EOF
 
+      - name: Initialize shadcn components
+        run: npx shadcn@latest init --yes
+
       - name: Commit scaffold to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Initialize modern Vite+React+TS+Tailwind v4+ESLint+Vitest+Husky+shadcn" || echo "No changes to commit"
+          git commit -m "Initialize modern Vite+React+TS+Tailwind+ESLint+Vitest+Husky+shadcn" || echo "No changes to commit"
           git push origin main
 
       - name: Build production bundle
