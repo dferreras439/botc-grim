@@ -3,10 +3,6 @@ name: Scaffold & Deploy Modern Vite React → GitHub Pages
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pages: write
-
 jobs:
   scaffold-and-deploy:
     runs-on: ubuntu-latest
@@ -22,13 +18,14 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Scaffold Vite + React TS (no auto-install)
+      - name: Scaffold Vite + React TS
         run: |
+          # Fetch only the template files (no installs, no prompts)
           npx degit vitejs/vite/packages/create-vite/template/react-ts temp-app
           cp -a temp-app/. .
           rm -rf temp-app
 
-      - name: Write custom vite.config.ts
+      - name: Write vite.config.ts
         run: |
           cat > vite.config.ts << 'EOF'
           import { defineConfig } from 'vite'
@@ -53,27 +50,26 @@ jobs:
             eslint prettier eslint-config-prettier \
             eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y \
             @typescript-eslint/parser @typescript-eslint/eslint-plugin \
-            lint-staged husky \
+            lint-staged \
             vitest @testing-library/react @testing-library/jest-dom \
             shadcn
 
-      - name: Initialize Tailwind CSS
+      - name: Initialize Tailwind
         run: npx tailwindcss init -p
 
       - name: Configure Tailwind content paths
         run: |
           sed -i "s|content: \\[\\]|content: ['index.html','src/**/*.{js,ts,jsx,tsx}','components/**/*.{js,ts,jsx,tsx}']|" tailwind.config.js
 
-      - name: Create main CSS with Tailwind import
+      - name: Write src/index.css
         run: |
-          mkdir -p src
           cat > src/index.css << 'EOF'
           @tailwind base;
           @tailwind components;
           @tailwind utilities;
           EOF
 
-      - name: Write ESLint & Prettier configs
+      - name: Write ESLint & Prettier config
         run: |
           cat > .eslintrc.json << 'EOF'
           {
@@ -109,42 +105,36 @@ jobs:
           npm pkg set scripts.test="vitest"
           npm pkg set lint-staged='{"src/**/*.{js,ts,jsx,tsx}":["eslint --fix","prettier --write"]}'
 
-      - name: Modern Husky setup
-        run: |
-          npm pkg set scripts.prepare="husky"
-          npm run prepare
-          printf "npx lint-staged\n" > .husky/pre-commit
-          chmod +x .husky/pre-commit
+      - name: Init shadcn components
+        run: npx shadcn@latest init --yes
 
       - name: Add TS alias for components
         run: |
           node << 'EOF'
-          const fs = require('fs')
-          const ts = JSON.parse(fs.readFileSync('tsconfig.json'))
-          ts.compilerOptions = ts.compilerOptions || {}
-          ts.compilerOptions.baseUrl = '.'
-          ts.compilerOptions.paths = ts.compilerOptions.paths || {}
-          ts.compilerOptions.paths['@/components/*'] = ['components/*']
-          ts.include = ts.include || []
-          if (!ts.include.includes('components')) ts.include.push('components')
-          fs.writeFileSync('tsconfig.json', JSON.stringify(ts, null, 2))
+          const fs = require('fs');
+          const ts = JSON.parse(fs.readFileSync('tsconfig.json'));
+          ts.compilerOptions = ts.compilerOptions || {};
+          ts.compilerOptions.baseUrl = '.';
+          ts.compilerOptions.paths = ts.compilerOptions.paths || {};
+          ts.compilerOptions.paths['@/components/*'] = ['components/*'];
+          ts.include = ts.include || [];
+          if (!ts.include.includes('components')) ts.include.push('components');
+          fs.writeFileSync('tsconfig.json', JSON.stringify(ts, null, 2));
           EOF
-
-      - name: Initialize shadcn components
-        run: npx shadcn@latest init --yes
 
       - name: Commit scaffold to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Initialize modern Vite+React+TS+Tailwind+ESLint+Vitest+Husky+shadcn" || echo "No changes to commit"
+          git commit -m "Initialize modern Vite+React+TS+Tailwind+ESLint+Vitest+shadcn" || echo "No changes to commit"
           git push origin main
 
+      - name: Install dependencies
+        run: npm install
+
       - name: Build production bundle
-        run: |
-          npm install
-          npm run build
+        run: npm run build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
@@ -153,7 +143,7 @@ jobs:
           publish_branch: gh-pages
           publish_dir: ./dist
 
-      - name: Enable GitHub Pages
+      - name: Configure GitHub Pages
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
