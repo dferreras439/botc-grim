@@ -4,22 +4,27 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # for pushing the gh-pages branch
-  pages: write      # for deploying via actions/deploy-pages
-  id-token: write   # required to request the OIDC token for pages deployment
+  contents: write   # needed to push gh-pages
+  pages: write      # needed by actions/deploy-pages
+  id-token: write   # needed by actions/deploy-pages for OIDC
 
 jobs:
   scaffold-and-deploy:
     runs-on: ubuntu-latest
 
+    # ← Add this so GitHub knows which Pages environment to use
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy-pages.outputs.page_url }}
+
     steps:
-      # 1) Checkout (with push creds)
+      # 1) Checkout repo (with push creds)
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
           persist-credentials: true
 
-      # 2) Setup Node.js 20+
+      # 2) Node.js 20+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
@@ -219,30 +224,30 @@ jobs:
           }
           EOF
 
-      # 4) Install & prepare (runs "prepare" to set up Husky)
+      # 4) Install & run "prepare" (sets up Husky)
       - name: Install dependencies & prepare
         run: npm install
 
-      # 5) Setup Husky pre-commit hook
-      - name: Husky pre-commit hook
+      # 5) Husky pre-commit hook
+      - name: Setup Husky pre-commit hook
         run: |
           printf "npx lint-staged\n" > .husky/pre-commit
           chmod +x .husky/pre-commit
 
-      # 6) Initialize shadcn/ui
+      # 6) Init shadcn/ui (requires the TS alias in tsconfig)
       - name: Initialize shadcn/ui
         run: npx shadcn@latest init --yes
 
-      # 7) Commit scaffold back to main
+      # 7) Commit the scaffold back to main
       - name: Commit scaffold to main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Scaffold full modern Vite+React+TS+Tailwind+ESLint+Vitest+Husky+shadcn" --no-verify || echo "Nothing to commit"
+          git commit -m "Scaffold full modern stack" --no-verify || echo "Nothing to commit"
           git push origin main
 
-      # 8) Build production bundle
+      # 8) Build for production
       - name: Build production bundle
         run: npm run build
 
@@ -252,6 +257,7 @@ jobs:
         with:
           path: ./dist
 
-      # 10) Deploy to GitHub Pages
+      # 10) Deploy to GitHub Pages (v4)
       - name: Deploy to GitHub Pages
+        id: deploy-pages
         uses: actions/deploy-pages@v4
