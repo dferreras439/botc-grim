@@ -1,0 +1,129 @@
+name: Scaffold & Deploy Modern Vite React → GitHub Pages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scaffold-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Scaffold Vite + React + TS + Tailwind + ESLint + Vitest + Husky
+        run: |
+          # 1) Bootstrap Vite React TS
+          npm init vite@latest temp-app -- --template react-ts --yes
+          cd temp-app && cd ..
+
+          # 2) Move into repo root
+          cp -a temp-app/. .
+          rm -rf temp-app
+
+          # 3) Overwrite vite.config.ts for GitHub Pages base & Vitest
+          cat > vite.config.ts << 'EOF'
+          import { defineConfig } from 'vite'
+          import react from '@vitejs/plugin-react'
+
+          export default defineConfig({
+            base: '/${{ github.event.repository.name }}/',
+            plugins: [react()],
+            test: {
+              globals: true,
+              environment: 'jsdom'
+            }
+          })
+          EOF
+
+          # 4) Install & configure Tailwind CSS
+          npm install -D tailwindcss postcss autoprefixer
+          npx tailwindcss init -p
+          sed -i "s|content: \\[\\]|content: ['index.html','src/**/*.{js,ts,jsx,tsx}']|" tailwind.config.js
+          cat > src/index.css << 'EOF'
+          @tailwind base;
+          @tailwind components;
+          @tailwind utilities;
+          EOF
+
+          # 5) Install linters, formatting, testing & hooks
+          npm install -D eslint prettier eslint-config-prettier eslint-plugin-react eslint-plugin-react-hooks eslint-plugin-jsx-a11y @typescript-eslint/parser @typescript-eslint/eslint-plugin lint-staged husky vitest @testing-library/react @testing-library/jest-dom
+
+          # ESLint config
+          cat > .eslintrc.json << 'EOF'
+          {
+            "root": true,
+            "parser": "@typescript-eslint/parser",
+            "parserOptions": {
+              "ecmaVersion": 2020,
+              "sourceType": "module",
+              "ecmaFeatures": { "jsx": true }
+            },
+            "plugins": ["react","react-hooks","@typescript-eslint"],
+            "extends": [
+              "eslint:recommended",
+              "plugin:react/recommended",
+              "plugin:@typescript-eslint/recommended",
+              "prettier"
+            ],
+            "settings": { "react": { "version": "detect" } },
+            "rules": {}
+          }
+          EOF
+
+          # Prettier config
+          cat > .prettierrc << 'EOF'
+          {
+            "semi": true,
+            "singleQuote": true,
+            "printWidth": 80
+          }
+          EOF
+
+          # Add Vitest script
+          npm pkg set scripts.test="vitest"
+
+          # Setup Husky + lint-staged
+          npx husky install
+          npx husky add .husky/pre-commit "npx lint-staged"
+          npm pkg set lint-staged='{"src/**/*.{js,ts,jsx,tsx}":["eslint --fix","prettier --write"]}'
+
+      - name: Commit scaffold to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Initialize Vite React TS + Tailwind + ESLint/Prettier + Vitest + Husky" || echo "No changes to commit"
+          git push origin main
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+
+      - name: Configure GitHub Pages
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -X PUT \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.switcheroo-preview+json" \
+            https://api.github.com/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/pages \
+            -d '{"source":{"branch":"gh-pages","path":"/"}}'
+            
