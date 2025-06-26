@@ -1,6 +1,6 @@
 module.exports = {
   plugins: {
-    tailwindcss: {},
+    '@tailwindcss/postcss': {},    # use the new PostCSS plugin :contentReference[oaicite:0]{index=0}
     autoprefixer: {}
   }
 };

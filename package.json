@@ -19,6 +19,7 @@
     "typescript": "*",
     "tailwindcss": "*",
     "@tailwindcss/vite": "*",
+    "@tailwindcss/postcss": "*",
     "postcss": "*",
     "autoprefixer": "*",
     "eslint": "*",
